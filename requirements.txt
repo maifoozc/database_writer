@@ -1,0 +1,4 @@
+# Database writer (mqtt_to_db.py) dependencies
+python-dotenv>=1.0.0
+paho-mqtt>=1.6.1
+psycopg2-binary>=2.9.0

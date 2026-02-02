@@ -1,0 +1,15 @@
+[Unit]
+Description=MQTT-to-DB ingest (standalone)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/opt/mqtt_to_db
+Environment=PATH=/opt/mqtt_to_db/venv/bin
+ExecStart=/opt/mqtt_to_db/venv/bin/python mqtt_to_db.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
