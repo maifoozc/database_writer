@@ -334,13 +334,13 @@ def run_ingest(config: Dict[str, Any]) -> None:
 
     topic = config["mqtt_topic"]
 
-    def on_connect(client: mqtt.Client, userdata: Any, flags: dict, rc: int) -> None:
-        if rc == 0:
+    def on_connect(client: mqtt.Client, userdata: Any, flags: Any, reason_code: Any, properties: Any = None) -> None:
+        if reason_code == 0:
             logger.info("Connected to MQTT %s:%s", config["mqtt_host"], config["mqtt_port"])
             client.subscribe(topic, qos=1)
             logger.info("Subscribed to %s", topic)
         else:
-            logger.error("MQTT connect failed: %s", rc)
+            logger.error("MQTT connect failed: %s", reason_code)
 
     def on_message(client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
         result = process_message(msg.topic, msg.payload, db_url)
@@ -348,12 +348,16 @@ def run_ingest(config: Dict[str, Any]) -> None:
         if w:
             logger.info("Topic %s -> %s: wrote %s rows", msg.topic, result.get("table", ""), w)
 
-    def on_disconnect(client: mqtt.Client, userdata: Any, rc: int) -> None:
-        if rc != 0:
-            logger.warning("MQTT disconnected (rc=%s). Will reconnect.", rc)
+    def on_disconnect(client: mqtt.Client, userdata: Any, flags: Any, reason_code: Any, properties: Any = None) -> None:
+        if reason_code != 0:
+            logger.warning("MQTT disconnected (rc=%s). Will reconnect.", reason_code)
 
     client_id = os.environ.get("MQTT_CLIENT_ID", "mqtt_to_db")
-    client = mqtt.Client(client_id=client_id, protocol=mqtt.MQTTv311)
+    client = mqtt.Client(
+        mqtt.CallbackAPIVersion.VERSION2,
+        client_id=client_id,
+        protocol=mqtt.MQTTv311,
+    )
     if config.get("mqtt_username"):
         client.username_pw_set(config["mqtt_username"], config.get("mqtt_password") or "")
     if config.get("mqtt_use_tls"):
