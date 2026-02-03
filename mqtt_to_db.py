@@ -37,19 +37,38 @@ logger = logging.getLogger("mqtt_to_db")
 # ---------------------------------------------------------------------------
 
 def _row_to_telemetry(row: Dict[str, Any]) -> Optional[Tuple]:
-    """Meter data -> (time, site_id, source_id, register_name, device_id, value, response_time_ms)."""
+    """Meter data -> (time, site_id, source_id, register_name, device_id, value, response_time_ms).
+    Accepts snake_case and camelCase (siteId, registerName, deviceId, responseTimeMs).
+    device_id can be int or string (e.g. "1" or legacy "grid_meter" -> hashed to int).
+    """
     try:
         t = row.get("time")
-        sid = row.get("site_id")
+        sid = row.get("site_id") or row.get("siteId")
         src = row.get("id")
-        reg = row.get("register_name")
-        did = row.get("device_id")
+        reg = row.get("register_name") or row.get("registerName")
+        did = row.get("device_id") or row.get("deviceId")
         val = row.get("value")
-        rt = row.get("response_time_ms")
-        if t is None or sid is None or src is None or reg is None or did is None or val is None:
+        rt = row.get("response_time_ms") or row.get("responseTimeMs")
+        if t is None or sid is None or reg is None or did is None or val is None:
             return None
+        # source_id: use id if present, else 0 (row still inserted)
+        if src is None:
+            src = 0
         time_str = t.isoformat() if hasattr(t, "isoformat") else str(t)
-        return (time_str, str(sid), int(src), str(reg), int(did), float(val), float(rt) if rt is not None else None)
+        # device_id: DB expects int; accept int or numeric string, or hash string (e.g. "grid_meter")
+        try:
+            device_id_int = int(did)
+        except (TypeError, ValueError):
+            device_id_int = abs(hash(str(did))) % (2**31)
+        return (
+            time_str,
+            str(sid),
+            int(src),
+            str(reg),
+            device_id_int,
+            float(val),
+            float(rt) if rt is not None else None,
+        )
     except (TypeError, ValueError):
         return None
 
@@ -168,22 +187,27 @@ def get_table_config_for_topic(topic: str) -> Optional[TableConfig]:
 
 def parse_payload(payload: Any) -> Optional[List[Dict[str, Any]]]:
     """Parse JSON from MQTT message. Returns list of row dicts (single object -> [obj])."""
-    if isinstance(payload, (list, dict)):
-        return [payload] if isinstance(payload, dict) else payload
     if isinstance(payload, bytes):
         try:
             data = json.loads(payload.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
             return None
+    elif isinstance(payload, (list, dict)):
+        data = payload
     else:
         try:
             data = json.loads(str(payload))
         except json.JSONDecodeError:
             return None
-    if isinstance(data, dict):
-        return [data]
     if isinstance(data, list):
         return data
+    if isinstance(data, dict):
+        # Wrapped payload: {"data": [...], "rows": [...], etc.}
+        if "data" in data and isinstance(data["data"], list):
+            return data["data"]
+        if "rows" in data and isinstance(data["rows"], list):
+            return data["rows"]
+        return [data]
     return None
 
 
@@ -262,9 +286,12 @@ def process_message(topic: str, payload: Any, connection_string: str) -> Dict[st
             rows.append(row)
 
     if not rows:
+        # Log first row's keys and sample values so we can see why mapper rejected
+        first = rows_data[0] if rows_data else {}
         logger.warning(
-            "Topic %s -> %s: all %s row(s) were skipped (missing/invalid fields for table)",
-            topic, table, len(rows_data),
+            "Topic %s -> %s: all %s row(s) were skipped (missing/invalid fields). "
+            "First row keys: %s; required for telemetry: time, site_id, id, register_name, device_id, value",
+            topic, table, len(rows_data), list(first.keys()),
         )
         return {"table": table, "written": 0}
 
