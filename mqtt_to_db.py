@@ -240,14 +240,19 @@ def process_message(topic: str, payload: Any, connection_string: str) -> Dict[st
     Route one MQTT message to the correct table and write. Used by both MQTT loop and Lambda.
     Returns {"table": str, "written": int} or {"error": str}.
     """
+    if not (connection_string or "").strip():
+        logger.error("DATABASE_URL is empty; cannot write to database")
+        return {"table": "", "written": 0}
+
     config = get_table_config_for_topic(topic)
     if not config:
-        logger.debug("No table config for topic: %s", topic)
+        logger.info("No table config for topic %s (expected suffix: meter_data, alarms, alarm_history, or locations)", topic)
         return {"table": "", "written": 0}
 
     table, columns, row_mapper, conflict_cols, update_cols = config
     rows_data = parse_payload(payload)
     if not rows_data:
+        logger.warning("Topic %s: payload could not be parsed as JSON list/object", topic)
         return {"table": table, "written": 0}
 
     rows: List[Tuple] = []
@@ -257,6 +262,10 @@ def process_message(topic: str, payload: Any, connection_string: str) -> Dict[st
             rows.append(row)
 
     if not rows:
+        logger.warning(
+            "Topic %s -> %s: all %s row(s) were skipped (missing/invalid fields for table)",
+            topic, table, len(rows_data),
+        )
         return {"table": table, "written": 0}
 
     written = write_batch_to_db(connection_string, table, columns, rows, conflict_cols, update_cols)
@@ -306,7 +315,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 DEFAULT_MQTT_HOST = "localhost"
 DEFAULT_MQTT_PORT = 1883
-DEFAULT_TOPIC = "ems/site/+#"  # all site subtopics (meter_data, alarms, etc.)
+DEFAULT_TOPIC = "ems/site/#"  # multi-level: matches ems/site/1/meter_data, etc.
 DEFAULT_DB_BATCH_SIZE = 500
 
 
@@ -343,10 +352,14 @@ def run_ingest(config: Dict[str, Any]) -> None:
             logger.error("MQTT connect failed: %s", reason_code)
 
     def on_message(client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
+        logger.info("Message received on %s (payload %s bytes)", msg.topic, len(msg.payload) if msg.payload else 0)
         result = process_message(msg.topic, msg.payload, db_url)
         w = result.get("written", 0)
         if w:
             logger.info("Topic %s -> %s: wrote %s rows", msg.topic, result.get("table", ""), w)
+        else:
+            # process_message already logs warnings for 0 rows; log at debug to avoid noise
+            logger.debug("Topic %s -> written 0 rows (table=%s)", msg.topic, result.get("table", ""))
 
     def on_disconnect(client: mqtt.Client, userdata: Any, flags: Any, reason_code: Any, properties: Any = None) -> None:
         if reason_code != 0:
