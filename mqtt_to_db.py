@@ -367,6 +367,13 @@ def run_ingest(config: Dict[str, Any]) -> None:
     if not db_url:
         logger.error("DATABASE_URL not set.")
         sys.exit(1)
+    # Catch common mistake: .env.example uses "host" as placeholder
+    if "@host:" in db_url or "@host/" in db_url:
+        logger.error(
+            'DATABASE_URL contains placeholder "host". '
+            'Replace with your PostgreSQL server: localhost, 127.0.0.1, or server IP/hostname.'
+        )
+        sys.exit(1)
 
     topic = config["mqtt_topic"]
 
