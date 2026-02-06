@@ -299,7 +299,7 @@ def process_message(topic: str, payload: Any, connection_string: str) -> Dict[st
 
     written = write_batch_to_db(connection_string, table, columns, rows, conflict_cols, update_cols)
     if written:
-        logger.info("Attempting to write %s rows to table %s", written, table)
+        logger.info("Inserted %s rows to table %s", written, table)
     return {"table": table, "written": written}
 
 
@@ -394,7 +394,7 @@ def run_ingest(config: Dict[str, Any]) -> None:
         result = process_message(msg.topic, msg.payload, db_url)
         w = result.get("written", 0)
         if w:
-            logger.info("Topic %s -> %s: inserted %s rows. Sample: %s", msg.topic, result.get("table", ""), w, rows[:2] if rows else "(no data)")
+            logger.info("Topic %s -> %s: inserted %s rows", msg.topic, result.get("table", ""), w)
         else:
             # process_message already logs warnings for 0 rows; log at debug to avoid noise
             logger.debug("Topic %s -> written 0 rows (table=%s)", msg.topic, result.get("table", ""))
