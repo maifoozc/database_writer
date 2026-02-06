@@ -236,14 +236,22 @@ def write_batch_to_db(
         return 0
 
     cols = ", ".join(columns)
-    if conflict_columns and update_columns:
+    if conflict_columns:
         conflict = ", ".join(conflict_columns)
-        updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_columns)
-        sql = f"""
+        if update_columns:
+            updates = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_columns)
+            sql = f"""
         INSERT INTO {table} ({cols})
         VALUES %s
         ON CONFLICT ({conflict})
         DO UPDATE SET {updates}
+        """
+        else:
+            sql = f"""
+        INSERT INTO {table} ({cols})
+        VALUES %s
+        ON CONFLICT ({conflict})
+        DO NOTHING
         """
     else:
         sql = f"INSERT INTO {table} ({cols}) VALUES %s"
