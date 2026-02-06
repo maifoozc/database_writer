@@ -227,6 +227,7 @@ def write_batch_to_db(
     if not rows:
         return 0
     logger.info("Attempting to insert %s rows to table %s", len(rows), table)
+    logger.debug("Sample data for table %s: %s", table, rows[:2])
     try:
         import psycopg2
         from psycopg2.extras import execute_values
@@ -393,7 +394,7 @@ def run_ingest(config: Dict[str, Any]) -> None:
         result = process_message(msg.topic, msg.payload, db_url)
         w = result.get("written", 0)
         if w:
-            logger.info("Topic %s -> %s: wrote %s rows", msg.topic, result.get("table", ""), w)
+            logger.info("Topic %s -> %s: inserted %s rows. Sample: %s", msg.topic, result.get("table", ""), w, rows[:2] if rows else "(no data)")
         else:
             # process_message already logs warnings for 0 rows; log at debug to avoid noise
             logger.debug("Topic %s -> written 0 rows (table=%s)", msg.topic, result.get("table", ""))
