@@ -165,7 +165,7 @@ def _location_columns() -> Sequence[str]:
 # Topic suffix or pattern -> (table_name, columns, row_mapper, conflict_columns, update_columns)
 # conflict_columns empty => INSERT only (no ON CONFLICT)
 TABLE_ROUTERS: List[Tuple[str, TableConfig]] = [
-    ("meter_data", ("telemetry", _telemetry_columns(), _row_to_telemetry, (), ())),
+    ("meter_data", ("telemetry", _telemetry_columns(), _row_to_telemetry, ("time", "site_id", "source_id"), ())),
     ("alarms", ("alarms", _alarm_columns(), _row_to_alarm, ("id",), ("title", "description", "severity", "category", "status", "timestamp", "location", "location_id", "component", "value", "threshold"))),
     ("alarm_history", ("alarm_history", _alarm_history_columns(), _row_to_alarm_history, ("id",), ("alarm_id", "state", "action", "user_id", "user_role", "timestamp", "notes"))),
     ("locations", ("locations", _location_columns(), _row_to_location, ("id",), ("city", "location", "capacity", "status"))),
