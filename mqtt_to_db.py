@@ -165,7 +165,7 @@ def _location_columns() -> Sequence[str]:
 # Topic suffix or pattern -> (table_name, columns, row_mapper, conflict_columns, update_columns)
 # conflict_columns empty => INSERT only (no ON CONFLICT)
 TABLE_ROUTERS: List[Tuple[str, TableConfig]] = [
-    ("meter_data", ("telemetry", _telemetry_columns(), _row_to_telemetry, ("time", "site_id", "source_id"), ("register_name", "device_id", "value", "response_time_ms"))),
+    ("meter_data", ("telemetry", _telemetry_columns(), _row_to_telemetry, (), ())),
     ("alarms", ("alarms", _alarm_columns(), _row_to_alarm, ("id",), ("title", "description", "severity", "category", "status", "timestamp", "location", "location_id", "component", "value", "threshold"))),
     ("alarm_history", ("alarm_history", _alarm_history_columns(), _row_to_alarm_history, ("id",), ("alarm_id", "state", "action", "user_id", "user_role", "timestamp", "notes"))),
     ("locations", ("locations", _location_columns(), _row_to_location, ("id",), ("city", "location", "capacity", "status"))),
@@ -226,7 +226,7 @@ def write_batch_to_db(
     """Upsert a batch into any table. If conflict_columns, use ON CONFLICT ... DO UPDATE; else plain INSERT."""
     if not rows:
         return 0
-    logger.info("Attempting to write %s rows to table %s", len(rows), table)
+    logger.info("Attempting to insert %s rows to table %s", len(rows), table)
     try:
         import psycopg2
         from psycopg2.extras import execute_values
