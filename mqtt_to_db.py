@@ -226,6 +226,7 @@ def write_batch_to_db(
     """Upsert a batch into any table. If conflict_columns, use ON CONFLICT ... DO UPDATE; else plain INSERT."""
     if not rows:
         return 0
+    logger.info("Attempting to write %s rows to table %s", len(rows), table)
     try:
         import psycopg2
         from psycopg2.extras import execute_values
@@ -296,6 +297,8 @@ def process_message(topic: str, payload: Any, connection_string: str) -> Dict[st
         return {"table": table, "written": 0}
 
     written = write_batch_to_db(connection_string, table, columns, rows, conflict_cols, update_cols)
+    if written:
+        logger.info("Attempting to write %s rows to table %s", written, table)
     return {"table": table, "written": written}
 
 
