@@ -37,10 +37,11 @@ logger = logging.getLogger("mqtt_to_db")
 # ---------------------------------------------------------------------------
 
 def _row_to_telemetry(row: Dict[str, Any]) -> Optional[Tuple]:
-    """Meter data -> (time, site_id, source_id, register_name, device_id, value, response_time_ms).
+    """Meter data -> (time, site_id, source_id, register_name, device_id, value, response_time_ms). 
     Accepts snake_case and camelCase (siteId, registerName, deviceId, responseTimeMs).
     device_id can be int or string (e.g. "1" or legacy "grid_meter" -> hashed to int).
     """
+    logger.debug("Telemetry row keys received: %s", list(row.keys())) # Added for debug
     try:
         t = row.get("time")
         sid = row.get("site_id") or row.get("siteId")
