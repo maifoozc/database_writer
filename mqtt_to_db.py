@@ -41,7 +41,6 @@ def _row_to_telemetry(row: Dict[str, Any]) -> Optional[Tuple]:
     Accepts snake_case and camelCase (siteId, registerName, deviceId, responseTimeMs).
     device_id can be int or string (e.g. "1" or legacy "grid_meter" -> hashed to int).
     """
-    logger.debug("Telemetry row keys received: %s", list(row.keys())) # Added for debug
     try:
         t = row.get("time")
         sid = row.get("site_id") or row.get("siteId")
@@ -293,6 +292,7 @@ def process_message(topic: str, payload: Any, connection_string: str) -> Dict[st
     rows: List[Tuple] = []
     for item in rows_data:
         row = row_mapper(item)
+        logger.debug("Mapper output for telemetry row: %s", row) # Added for debug
         if row is not None:
             rows.append(row)
 
