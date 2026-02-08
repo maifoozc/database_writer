@@ -57,18 +57,12 @@ def _row_to_telemetry(row: Dict[str, Any]) -> Optional[Tuple]:
 
         time_str = t.isoformat() if hasattr(t, "isoformat") else str(t)
 
-        # device_id: DB expects int; accept int or numeric string, or hash string (e.g. "grid_meter")
-        try:
-            device_id_int = int(device_id_raw)
-        except (TypeError, ValueError):
-            device_id_int = abs(hash(str(device_id_raw))) % (2**31)
-
         return (
             time_str,
             str(sid),
-            int(source_id), # source_id is BIGINT in DB
+            str(source_id), # source_id is TEXT in DB
             str(reg),
-            device_id_int, # device_id is INT in DB
+            str(device_id_raw), # device_id is TEXT in DB
             float(val),
             float(rt) if rt is not None else None,
         )
