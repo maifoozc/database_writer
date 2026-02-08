@@ -338,6 +338,7 @@ def write_batch_to_db(
         with db_conn.cursor() as cur:
             execute_values(cur, sql, rows, page_size=min(len(rows), 500))
         db_conn.commit() # Commit changes
+        logger.debug(f"Successfully committed batch of {len(rows)} rows to table {table}.") # New log
         return len(rows)
     except Exception as e:
         db_conn.rollback() # Rollback on error
@@ -377,12 +378,10 @@ def process_message(topic: str, payload: Any, connection_string: str, db_conn: A
             _write_to_dlq(dlq_file_path, dlq_max_size_mb, topic, payload, reason)
         return {"table": table, "written": 0}
 
-    logger.debug("Received payload first row: %s", rows_data[0]) # New debug log
 
     rows: List[Tuple] = []
     for item in rows_data:
         row = row_mapper(item)
-        logger.debug("Mapper output for telemetry row: %s", row) # Added for debug
         if row is not None:
             rows.append(row)
         else:
@@ -504,7 +503,7 @@ def run_ingest(config: Dict[str, Any]) -> None:
     # Perform schema validation for all tables
     for _, table_config in TABLE_ROUTERS:
         table_name = table_config[0]
-        expected_columns = table_config[1]() # Call the function to get the sequence of columns
+        expected_columns = table_config[1]
         if not _validate_table_schema(db_conn, table_name, expected_columns):
             logger.critical(f"Aborting due to schema validation failure for table '{table_name}'.")
             db_conn.close()
